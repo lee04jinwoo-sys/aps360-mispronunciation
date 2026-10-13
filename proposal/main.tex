@@ -11,6 +11,8 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
 
 % APS360.sty is a NeurIPS style; with [final] its first-page footer calls an
 % undefined \@trackname. Blank the footer instead of editing the course file.
@@ -32,64 +34,94 @@
 
 \vspace{-0.5in}
 
-% Page budget: main text <= 2 pages (references excluded). 3 pages = -20%.
+% DRAFT -- every number below comes from `python -m src.data_stats data/l2arctic`.
+% Rewrite in your own words before submitting.
 
 \section*{Introduction}
-% (4 pts) Goal, why it matters, why deep learning.
-% - Goal: given a recording of a read English sentence and its canonical
-%   phone sequence, flag each phone as correctly pronounced or mispronounced.
-% - Why: learners (esp. Korean L1, e.g. /r/-/l/, /f/-/p/, /v/-/b/, /z/-/dZ/)
-%   rarely get phone-level feedback outside a classroom; human raters are scarce.
-% - Why DL: acoustic realisations vary across speakers; hand-crafted
-%   thresholds (GOP) generalise poorly; CNNs learn time-frequency patterns
-%   directly from spectrograms.
+Learners of English rarely get feedback on \emph{which sound} they got wrong: a teacher can listen to only a few
+sentences per student, and speaking apps usually return a single sentence-level score. Korean speakers make
+systematic errors that are easy to name but hard to self-monitor; in the corpus used here the most frequent
+Korean-L1 substitutions are \texttt{DH}$\rightarrow$\texttt{D} (``\emph{the}''$\rightarrow$``\emph{de}'', 357 cases),
+\texttt{Z}$\rightarrow$\texttt{S} (296) and \texttt{IH}$\rightarrow$\texttt{IY} (114). The goal of this project is a model that takes a
+recording of a read sentence and its expected phone sequence and flags each phone as
+\emph{correct} or \emph{mispronounced}. Deep learning fits this task because the same phone is realised very
+differently across speakers, genders and recording conditions; fixed acoustic thresholds such as the classic
+Goodness of Pronunciation score \cite{witt2000phone} generalise poorly, whereas a CNN can learn the relevant
+time--frequency patterns directly from spectrograms.
 
 \section*{Illustration}
-% (4 pts) Pipeline figure: waveform -> phone segmentation (annotation
-% boundaries) -> log-mel patch + canonical phone embedding -> CNN -> P(error).
-
 \begin{figure}[!h]
   \centering
-  \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
-  \caption{TODO: overall pipeline.}
+  \begin{tikzpicture}[node distance=0.35cm, every node/.style={font=\scriptsize, align=center},
+      box/.style={draw, rounded corners, minimum height=0.9cm, inner sep=3pt}, >={Stealth}]
+    \node[box] (wav) {recording +\\ text prompt};
+    \node[box, right=of wav] (seg) {phone segments\\ from annotation\\ (start, end, phone)};
+    \node[box, right=of seg] (mel) {300\,ms log-mel\\ window + phone\\ mask (2$\times$64$\times$30)};
+    \node[box, right=of mel, fill=blue!8] (cnn) {CNN encoder\\ (pre-trained as\\ phone classifier)};
+    \node[box, below=0.25cm of cnn] (emb) {expected-phone\\ embedding};
+    \node[box, right=of cnn, fill=blue!8] (fc) {FC +\\ sigmoid};
+    \node[box, right=of fc] (out) {$P$(mispronounced)\\ e.g.\ \texttt{DH}: 0.91};
+    \draw[->] (wav) -- (seg); \draw[->] (seg) -- (mel); \draw[->] (mel) -- (cnn);
+    \draw[->] (cnn) -- (fc); \draw[->] (emb) -| (fc); \draw[->] (fc) -- (out);
+  \end{tikzpicture}
+  \caption{Proposed pipeline. Each expected phone is cut from the utterance with context, converted to a log-mel
+  patch, encoded by a CNN and combined with an embedding of the phone that \emph{should} have been produced.}
   \label{fig:pipeline}
 \end{figure}
 
 \section*{Background \& Related Work}
-% (4 pts) >= 5 prior works, one or two sentences each.
-% GOP \cite{witt2000phone}; DNN acoustic model + LR \cite{hu2015improved};
-% CNN-RNN-CTC end-to-end MDD \cite{leung2019cnn}; wav2vec 2.0
-% \cite{baevski2020wav2vec} and its MDD fine-tuning \cite{xu2021explore,peng2021study};
-% L2-ARCTIC corpus \cite{zhao2018l2arctic}.
+\textbf{GOP} \cite{witt2000phone} scores a phone by the posterior of the expected phone from an HMM acoustic
+model and thresholds it; it is still the standard non-neural approach. \textbf{Hu et al.} \cite{hu2015improved}
+replaced the GMM with a DNN acoustic model and fed GOP-like features into phone-specific logistic-regression
+classifiers. \textbf{Leung et al.} \cite{leung2019cnn} proposed an end-to-end CNN-RNN-CTC phone recogniser
+whose output is aligned with the expected phones, removing the need for forced alignment. \textbf{wav2vec 2.0}
+\cite{baevski2020wav2vec} learns speech representations from unlabeled audio; \textbf{Xu et al.} \cite{xu2021explore}
+and \textbf{Peng et al.} \cite{peng2021study} fine-tuned it for mispronunciation detection and reported strong
+results on L2-ARCTIC. \textbf{L2-ARCTIC} \cite{zhao2018l2arctic} is the non-native speech corpus with phone-level
+error annotations used in all of these works. In contrast to the large pre-trained models, this project designs a
+small CNN trained from scratch and studies how much a weakly supervised pre-training step (phone recognition on noisy forced-alignment labels) on
+\emph{unannotated} utterances of the same corpus helps.
 
 \section*{Data Processing}
-% (4 pts) Must be reproducible by a classmate. Fill numbers from
-% src/data_stats.py output, not by hand.
-% 1. Source: L2-ARCTIC v5.0 (CC BY-NC 4.0), 24 speakers, 6 L1s.
-% 2. Use the manually annotated subset (annotation/*.TextGrid).
-% 3. Parse phone tier: canonical phone, perceived phone, error type (S/D/A).
-% 4. Cut each phone segment (+ context window), resample to 16 kHz,
-%    compute log-mel (n_mels, hop TBD), pad/crop to fixed length.
-% 5. Label: 1 if substitution/deletion, 0 if correct. Insertions handled TBD.
-% 6. Split by speaker (no speaker in more than one split); Korean speakers
-%    held out as a dedicated test set.
-% 7. Class imbalance: report error rate; weighted loss / resampling.
+\textbf{Source.} L2-ARCTIC v5.0 \cite{zhao2018l2arctic} (CC BY-NC 4.0): 24 speakers, 6 L1s (Arabic, Mandarin,
+Hindi, Korean, Spanish, Vietnamese; 2 male + 2 female each), $\sim$1,130 read sentences per speaker at 44.1\,kHz.
+3,599 of these utterances have manual phone-level annotations. \textbf{Steps.}
+(1)~Parse the \texttt{phones} tier of every annotation TextGrid. A label is either a phone (correct) or
+\texttt{CPL,PPL,type} with type \texttt{s} (substitution), \texttt{d} (deletion) or \texttt{a} (addition); stress digits
+are removed and \texttt{err}/\texttt{*} tags kept. This yields 120,243 phone segments: 101,633 correct, 14,098
+substitutions, 3,420 deletions and 1,092 additions (15.5\% errors; Korean speakers 9.9\%).
+(2)~Label each expected phone as mispronounced if it is a substitution or deletion; additions have no expected
+phone and are excluded. (3)~Resample audio to 16\,kHz and compute 64-bin log-mel spectrograms
+(25\,ms window, 10\,ms hop). (4)~Phones are short (median 90\,ms, 95th percentile 200\,ms), so each sample is a fixed
+300\,ms window centred on the phone, plus a binary mask channel marking the phone's own frames.
+(5)~Split by speaker so no voice appears in two sets: test = two Korean speakers (HKK, YDCK); validation = one
+speaker from each other L1; training = the remaining 17 speakers (including the other two Korean speakers).
+(6)~For pre-training, repurpose the 23,268 \emph{unannotated} utterances: their forced-alignment TextGrids
+give phone boundaries, so every segment becomes a 40-class phone-recognition example.
+(7)~Handle the 1:5.5 class imbalance with a class-weighted loss; normalise features with training-set statistics.
 
 \section*{Architecture}
-% (2 pts) 2-D CNN over log-mel patch (conv-BN-ReLU-pool blocks) +
-% learned embedding of canonical phone, concatenated before FC layers,
-% sigmoid output. Rough sizes OK.
+A 2-D CNN encoder takes the $2\times64\times30$ input (log-mel + mask): four blocks of
+conv~3$\times$3 $\rightarrow$ batch norm $\rightarrow$ ReLU $\rightarrow$ max-pool (32--128 channels),
+followed by global average pooling. It is first trained as a 40-way phone classifier on the unannotated data.
+For detection, its 128-d output is concatenated with a learned 16-d embedding of the expected phone and passed
+through two fully connected layers with dropout and a sigmoid. Training uses Adam and weighted binary
+cross-entropy, with early stopping on validation F1.
 
 \section*{Baseline Model}
-% (2 pts) Reproducible: mean/std of 13 MFCC (+deltas) over the segment +
-% one-hot canonical phone -> logistic regression (scikit-learn).
-% Metrics: precision / recall / F1 on the error class (standard for MDD).
+Per segment, compute 13 MFCCs with first and second derivatives (39 features per frame), take their mean and
+standard deviation over the phone (78 features) and append a one-hot expected phone (40). A class-weighted
+logistic regression (scikit-learn) is trained on the same speaker split. Both models are evaluated with
+precision, recall and F1 on the \emph{mispronounced} class, the standard metrics for this task, overall and
+per L1 on the Korean test speakers.
 
 \section*{Ethical Considerations}
-% (2 pts) Accent vs. error (risk of treating accent as "wrong");
-% only 24 speakers / 6 L1s -> bias against unseen L1s, genders, ages;
-% voice is biometric data (license, no redistribution);
-% over-reliance on automatic feedback.
+The labels encode one annotation team's judgement of ``standard'' American English; a model trained on them may
+treat an accent as an error and discourage intelligible but accented speech, so outputs should be presented as
+feedback, not a grade. With only 24 speakers from 6 L1s, all adults reading the same prompts, performance on
+other L1s, children, spontaneous speech or other microphones is unknown and likely worse. Voice recordings are
+biometric data: the corpus licence is non-commercial and forbids redistribution, so the audio is not included
+in the public repository.
 
 \newpage
 \bibliographystyle{plain}

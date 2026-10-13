@@ -1,0 +1,98 @@
+\documentclass[final]{article}
+
+\usepackage{APS360}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{graphicx}
+
+% APS360.sty is a NeurIPS style; with [final] its first-page footer calls an
+% undefined \@trackname. Blank the footer instead of editing the course file.
+\makeatletter
+\renewcommand{\@noticestring}{}
+\makeatother
+
+\title{Phone-Level Mispronunciation Detection for Korean Learners of English}
+
+\author{%
+  Jinwoo Lee \\
+  Student Number: TODO, lee04jinwoo@gmail.com\\
+  \url{https://github.com/lee04jinwoo-sys/aps360-mispronunciation}\\
+}
+
+\begin{document}
+
+\maketitle
+
+\vspace{-0.5in}
+
+% Page budget: main text <= 2 pages (references excluded). 3 pages = -20%.
+
+\section*{Introduction}
+% (4 pts) Goal, why it matters, why deep learning.
+% - Goal: given a recording of a read English sentence and its canonical
+%   phone sequence, flag each phone as correctly pronounced or mispronounced.
+% - Why: learners (esp. Korean L1, e.g. /r/-/l/, /f/-/p/, /v/-/b/, /z/-/dZ/)
+%   rarely get phone-level feedback outside a classroom; human raters are scarce.
+% - Why DL: acoustic realisations vary across speakers; hand-crafted
+%   thresholds (GOP) generalise poorly; CNNs learn time-frequency patterns
+%   directly from spectrograms.
+
+\section*{Illustration}
+% (4 pts) Pipeline figure: waveform -> phone segmentation (annotation
+% boundaries) -> log-mel patch + canonical phone embedding -> CNN -> P(error).
+
+\begin{figure}[!h]
+  \centering
+  \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+  \caption{TODO: overall pipeline.}
+  \label{fig:pipeline}
+\end{figure}
+
+\section*{Background \& Related Work}
+% (4 pts) >= 5 prior works, one or two sentences each.
+% GOP \cite{witt2000phone}; DNN acoustic model + LR \cite{hu2015improved};
+% CNN-RNN-CTC end-to-end MDD \cite{leung2019cnn}; wav2vec 2.0
+% \cite{baevski2020wav2vec} and its MDD fine-tuning \cite{xu2021explore,peng2021study};
+% L2-ARCTIC corpus \cite{zhao2018l2arctic}.
+
+\section*{Data Processing}
+% (4 pts) Must be reproducible by a classmate. Fill numbers from
+% src/data_stats.py output, not by hand.
+% 1. Source: L2-ARCTIC v5.0 (CC BY-NC 4.0), 24 speakers, 6 L1s.
+% 2. Use the manually annotated subset (annotation/*.TextGrid).
+% 3. Parse phone tier: canonical phone, perceived phone, error type (S/D/A).
+% 4. Cut each phone segment (+ context window), resample to 16 kHz,
+%    compute log-mel (n_mels, hop TBD), pad/crop to fixed length.
+% 5. Label: 1 if substitution/deletion, 0 if correct. Insertions handled TBD.
+% 6. Split by speaker (no speaker in more than one split); Korean speakers
+%    held out as a dedicated test set.
+% 7. Class imbalance: report error rate; weighted loss / resampling.
+
+\section*{Architecture}
+% (2 pts) 2-D CNN over log-mel patch (conv-BN-ReLU-pool blocks) +
+% learned embedding of canonical phone, concatenated before FC layers,
+% sigmoid output. Rough sizes OK.
+
+\section*{Baseline Model}
+% (2 pts) Reproducible: mean/std of 13 MFCC (+deltas) over the segment +
+% one-hot canonical phone -> logistic regression (scikit-learn).
+% Metrics: precision / recall / F1 on the error class (standard for MDD).
+
+\section*{Ethical Considerations}
+% (2 pts) Accent vs. error (risk of treating accent as "wrong");
+% only 24 speakers / 6 L1s -> bias against unseen L1s, genders, ages;
+% voice is biometric data (license, no redistribution);
+% over-reliance on automatic feedback.
+
+\newpage
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

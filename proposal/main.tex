@@ -94,16 +94,18 @@ substitutions, 3,420 deletions and 1,092 additions (15.5\% errors; Korean speake
 phone and are excluded. (3)~Resample audio to 16\,kHz and compute 64-bin log-mel spectrograms
 (25\,ms window, 10\,ms hop). (4)~Phones are short (median 90\,ms, 95th percentile 200\,ms), so each sample is a fixed
 300\,ms window centred on the phone, plus a binary mask channel marking the phone's own frames.
-(5)~Split by speaker so no voice appears in two sets: test = two Korean speakers (HKK, YDCK); validation = one
-speaker from each other L1; training = the remaining 17 speakers (including the other two Korean speakers).
-(6)~For pre-training, repurpose the 23,268 \emph{unannotated} utterances: their forced-alignment TextGrids
-give phone boundaries, so every segment becomes a 40-class phone-recognition example.
+(5)~Split by speaker so no voice appears in two sets. To compare with prior work \cite{peng2021study}, the
+test set is the standard six speakers (NJS, TLV, TNI, TXHC, YKWK, ZHAA; one per L1, 29,786 phones, 13.9\% errors),
+with Korean results reported separately for YKWK; validation = one further speaker per L1; training = the
+remaining 12 speakers. (6)~For pre-training, repurpose the 17,379 \emph{unannotated} utterances of the
+18 non-test speakers (test speakers are excluded to avoid leakage): their forced-alignment TextGrids give phone
+boundaries, so every segment becomes a 40-class phone-recognition example.
 (7)~Handle the 1:5.5 class imbalance with a class-weighted loss; normalise features with training-set statistics.
 
 \section*{Architecture}
 A 2-D CNN encoder takes the $2\times64\times30$ input (log-mel + mask): four blocks of
 conv~3$\times$3 $\rightarrow$ batch norm $\rightarrow$ ReLU $\rightarrow$ max-pool (32--128 channels),
-followed by global average pooling. It is first trained as a 40-way phone classifier on the unannotated data.
+followed by global average pooling. It is first trained as a 40-way phone classifier on the unannotated non-test utterances.
 For detection, its 128-d output is concatenated with a learned 16-d embedding of the expected phone and passed
 through two fully connected layers with dropout and a sigmoid. Training uses Adam and weighted binary
 cross-entropy, with early stopping on validation F1.
@@ -113,7 +115,7 @@ Per segment, compute 13 MFCCs with first and second derivatives (39 features per
 standard deviation over the phone (78 features) and append a one-hot expected phone (40). A class-weighted
 logistic regression (scikit-learn) is trained on the same speaker split. Both models are evaluated with
 precision, recall and F1 on the \emph{mispronounced} class, the standard metrics for this task, overall and
-per L1 on the Korean test speakers.
+per L1, including the Korean test speaker.
 
 \section*{Ethical Considerations}
 The labels encode one annotation team's judgement of ``standard'' American English; a model trained on them may

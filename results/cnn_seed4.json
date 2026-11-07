@@ -1,0 +1,54 @@
+{
+  "model": "PhoneCNN (4 conv blocks, GAP, 16-d phone embedding, MLP head), trained from scratch",
+  "seed": 4,
+  "device": "mps",
+  "train_minutes": 1.4,
+  "parameters": 260577,
+  "epochs_run": 4,
+  "best_epoch": 0,
+  "threshold_from_val": 0.535780668258667,
+  "val_f1_best": 0.4597117737696003,
+  "test_overall": {
+    "precision": 0.3786951198180864,
+    "recall": 0.5229468599033816,
+    "f1": 0.43928172872070603
+  },
+  "test_korean_YKWK": {
+    "precision": 0.3935018050541516,
+    "recall": 0.5532994923857868,
+    "f1": 0.4599156118143459
+  },
+  "test_by_l1": {
+    "Arabic": {
+      "precision": 0.24041811846689895,
+      "recall": 0.5487077534791253,
+      "f1": 0.3343428225317989
+    },
+    "Chinese": {
+      "precision": 0.37384412153236457,
+      "recall": 0.45645161290322583,
+      "f1": 0.41103848946986205
+    },
+    "Hindi": {
+      "precision": 0.29179646936656284,
+      "recall": 0.5026833631484794,
+      "f1": 0.3692509855453351
+    },
+    "Korean": {
+      "precision": 0.3935018050541516,
+      "recall": 0.5532994923857868,
+      "f1": 0.4599156118143459
+    },
+    "Spanish": {
+      "precision": 0.3374358974358974,
+      "recall": 0.5132605304212169,
+      "f1": 0.40717821782178215
+    },
+    "Vietnamese": {
+      "precision": 0.6414189837008629,
+      "recall": 0.5456769983686787,
+      "f1": 0.5896870868223888
+    }
+  },
+  "n_test": 29786
+}

@@ -1,0 +1,53 @@
+{
+  "model": "MFCC statistics (78) + one-hot expected phone (40) -> logistic regression, class_weight=balanced",
+  "threshold_from_val": 0.588341474533081,
+  "test_overall": {
+    "precision": 0.3348949270512649,
+    "recall": 0.6043478260869565,
+    "f1": 0.43097063129790714
+  },
+  "test_korean_YKWK": {
+    "precision": 0.36231884057971014,
+    "recall": 0.6345177664974619,
+    "f1": 0.46125461254612543
+  },
+  "test_by_l1": {
+    "Arabic": {
+      "precision": 0.24015444015444015,
+      "recall": 0.6182902584493042,
+      "f1": 0.3459399332591768
+    },
+    "Chinese": {
+      "precision": 0.28463855421686746,
+      "recall": 0.6096774193548387,
+      "f1": 0.38809034907597534
+    },
+    "Hindi": {
+      "precision": 0.26706484641638223,
+      "recall": 0.5599284436493739,
+      "f1": 0.36164067013287116
+    },
+    "Korean": {
+      "precision": 0.36231884057971014,
+      "recall": 0.6345177664974619,
+      "f1": 0.46125461254612543
+    },
+    "Spanish": {
+      "precision": 0.2993150684931507,
+      "recall": 0.6817472698907956,
+      "f1": 0.415992384578772
+    },
+    "Vietnamese": {
+      "precision": 0.5825571549534293,
+      "recall": 0.5611745513866232,
+      "f1": 0.5716659742417948
+    }
+  },
+  "reference_always_mispronounced": {
+    "precision": 0.13899147250386087,
+    "recall": 1.0,
+    "f1": 0.2440606024877675
+  },
+  "n_test": 29786,
+  "test_error_rate": 0.13899147250386087
+}

@@ -14,3 +14,35 @@ redistributed here; request your own copy from the official site and unzip it in
 
 - `proposal/` – LaTeX source of the project proposal (course template)
 - `src/` – data processing and model code
+
+## Status (progress report, 2026-11)
+
+- [x] Data pipeline: L2-ARCTIC phone segments -> 300 ms log-mel windows + phone mask, speaker-disjoint split (12/6/6)
+- [x] Baseline: 78 MFCC statistics + one-hot expected phone -> logistic regression
+- [ ] CNN trained from scratch (in progress)
+- [ ] Weakly supervised pre-training on forced-alignment labels (planned)
+
+### Baseline results (`results/baseline.json`)
+
+Test = the six standard speakers (29,786 phones, 13.9% mispronounced). Threshold chosen on the validation speakers only.
+
+| | Precision | Recall | F1 (mispronounced) |
+|---|---|---|---|
+| All test speakers | 0.335 | 0.604 | 0.431 |
+| Korean (YKWK) | 0.362 | 0.635 | 0.461 |
+| Always predict "mispronounced" | 0.139 | 1.000 | 0.244 |
+
+## Reproduce
+
+```bash
+python -m pip install -r requirements.txt
+python -m src.build_cache data/l2arctic data/cache   # ~15 s
+python -m src.run_baseline
+python -m pytest -q
+```
+
+## AI assistance
+
+An AI coding assistant (Claude Code) wrote much of the code and tests under my direction: I set the
+project direction, the data split and the evaluation protocol, and reviewed the results. This is stated
+here for transparency.

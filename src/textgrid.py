@@ -21,14 +21,23 @@ def _norm(phone: str) -> str:
     return re.sub(r"\d$", "", phone.strip().upper())
 
 
+def _norm_canonical(phone: str) -> str:
+    """Like _norm, but also drops stray annotation typos (D_, ER), V``, W`).
+
+    The corpus has a handful of canonical labels with trailing punctuation;
+    left alone they would become six spurious phone classes.
+    """
+    return re.sub(r"[^A-Z]", "", _norm(phone))
+
+
 def parse_phone_label(label: str) -> tuple[str, str, str]:
     parts = [p.strip() for p in label.split(",")]
     if len(parts) == 1:
-        phone = _norm(parts[0])
+        phone = _norm_canonical(parts[0])
         return phone, phone, "correct"
     if len(parts) != 3 or parts[2].lower() not in ERROR_TYPES:
         raise ValueError(f"unexpected phone label: {label!r}")
-    return _norm(parts[0]), _norm(parts[1]), parts[2].lower()
+    return _norm_canonical(parts[0]), _norm(parts[1]), parts[2].lower()
 
 
 _INTERVAL = re.compile(

@@ -53,9 +53,3 @@ python -m src.run_baseline
 python -m src.run_cnn data/cache 0   # ~3 min on Apple MPS
 python -m pytest -q
 ```
-
-## AI assistance
-
-An AI coding assistant (Claude Code) wrote much of the code and tests under my direction: I set the
-project direction, the data split and the evaluation protocol, and reviewed the results. This is stated
-here for transparency.

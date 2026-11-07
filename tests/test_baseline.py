@@ -132,3 +132,27 @@ def test_scores_are_probabilities():
     scores = baseline.predict_scores(model, scaler, train)
 
     assert ((scores >= 0) & (scores <= 1)).all()
+
+
+def test_best_threshold_matches_exhaustive_search_on_random_data():
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 500)
+    scores = np.round(rng.random(500) * 0.6 + 0.3 * y, 2)  # rounded -> many ties
+
+    t = metrics.best_threshold(y, scores)
+
+    best = max(metrics.prf(y, (scores >= c).astype(int))["f1"] for c in np.unique(scores))
+    assert metrics.prf(y, (scores >= t).astype(int))["f1"] == pytest.approx(best)
+
+
+def test_best_threshold_is_fast_on_validation_sized_input():
+    import time
+
+    rng = np.random.default_rng(1)
+    y = rng.integers(0, 2, 30_000)
+    scores = rng.random(30_000)
+
+    start = time.perf_counter()
+    metrics.best_threshold(y, scores)
+
+    assert time.perf_counter() - start < 1.0

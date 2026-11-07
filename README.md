@@ -19,7 +19,7 @@ redistributed here; request your own copy from the official site and unzip it in
 
 - [x] Data pipeline: L2-ARCTIC phone segments -> 300 ms log-mel windows + phone mask, speaker-disjoint split (12/6/6)
 - [x] Baseline: 78 MFCC statistics + one-hot expected phone -> logistic regression
-- [ ] CNN trained from scratch (in progress)
+- [x] CNN trained from scratch (one seed so far)
 - [ ] Weakly supervised pre-training on forced-alignment labels (planned)
 
 ### Baseline results (`results/baseline.json`)
@@ -32,12 +32,25 @@ Test = the six standard speakers (29,786 phones, 13.9% mispronounced). Threshold
 | Korean (YKWK) | 0.362 | 0.635 | 0.461 |
 | Always predict "mispronounced" | 0.139 | 1.000 | 0.244 |
 
+### CNN results (`results/cnn_seed0.json`, seed 0)
+
+Same test speakers and protocol; early stopping and the threshold use validation speakers only.
+
+| | Precision | Recall | F1 (mispronounced) |
+|---|---|---|---|
+| All test speakers | 0.383 | 0.532 | 0.445 |
+| Korean (YKWK) | 0.460 | 0.575 | 0.511 |
+
+One seed only, so the +0.014 overall gain over the baseline is not yet distinguishable from run-to-run noise.
+Validation F1 plateaus after epoch 3 while training loss keeps falling.
+
 ## Reproduce
 
 ```bash
 python -m pip install -r requirements.txt
 python -m src.build_cache data/l2arctic data/cache   # ~15 s
 python -m src.run_baseline
+python -m src.run_cnn data/cache 0   # ~3 min on Apple MPS
 python -m pytest -q
 ```
 

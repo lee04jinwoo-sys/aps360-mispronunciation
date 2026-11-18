@@ -7,3 +7,8 @@ proposal/*.log
 proposal/*.out
 proposal/*.bbl
 proposal/*.blg
+progress/*.aux
+progress/*.log
+progress/*.out
+progress/*.bbl
+progress/*.blg

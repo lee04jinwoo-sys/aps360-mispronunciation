@@ -13,6 +13,7 @@ redistributed here; request your own copy from the official site and unzip it in
 ## Layout
 
 - `proposal/` – LaTeX source of the project proposal (course template)
+- `progress/` – LaTeX source of the progress report
 - `src/` – data processing and model code
 
 ## Status (progress report, 2026-11)
@@ -21,6 +22,7 @@ redistributed here; request your own copy from the official site and unzip it in
 - [x] Baseline: 78 MFCC statistics + one-hot expected phone -> logistic regression
 - [x] CNN trained from scratch (5 seeds)
 - [x] Error analysis by phone, error type, substitution pair and L1
+- [x] Deleted-phone segments checked (`results/deletion_stats.json`): 3,420 deletions, none empty, median 40 ms
 - [ ] Weakly supervised pre-training on forced-alignment labels (planned)
 
 ### Baseline results (`results/baseline.json`)
@@ -88,5 +90,6 @@ python -m src.build_cache data/l2arctic data/cache   # ~15 s
 python -m src.run_baseline
 python -m src.run_cnn data/cache 0   # one seed, ~3 min on Apple MPS (seeds 0-4 for the error analysis)
 python -m src.run_error_analysis data/l2arctic data/cache   # ~15 s
+python -m src.deletion_stats data/l2arctic
 python -m pytest -q
 ```

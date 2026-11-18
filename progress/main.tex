@@ -1,0 +1,202 @@
+\documentclass[final]{article}
+
+\usepackage{APS360}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+% APS360.sty is a NeurIPS style; with [final] its first-page footer calls an
+% undefined \@trackname. Blank the footer instead of editing the course file.
+\makeatletter
+\renewcommand{\@noticestring}{}
+\makeatother
+
+\title{Progress Report:\\ Phone-Level Mispronunciation Detection for Korean Learners of English}
+
+\author{%
+  Jinwoo Lee \\
+  Student Number: XXXXXXXXXX, (email omitted)\\
+  \url{https://github.com/lee04jinwoo-sys/aps360-mispronunciation}\\
+}
+
+\begin{document}
+
+\maketitle
+
+\vspace{-0.5in}
+
+% DRAFT -- every number below comes from a file in results/ (see README "Reproduce").
+% Rewrite in your own words before submitting. Check the page limit on Quercus.
+
+\section*{Project Description}
+The model takes a recording of a read English sentence and the phones the speaker \emph{should} have produced, and
+flags each phone as \emph{correct} or \emph{mispronounced}. The motivation is that Korean learners make systematic
+substitutions they cannot easily hear themselves (in L2-ARCTIC the most frequent Korean-L1 errors are
+\texttt{DH}$\rightarrow$\texttt{D} and \texttt{Z}$\rightarrow$\texttt{S}), while most speaking apps return only a
+sentence-level score. \textbf{Success criterion} (added after proposal feedback): models are compared by precision,
+recall and F1 on the \emph{mispronounced} class on six held-out test speakers; the CNN counts as a success if its
+F1 is above the MFCC logistic-regression baseline for every training seed, and the pre-trained CNN if it is above
+the CNN trained from scratch. Figure~\ref{fig:pipeline} shows the pipeline; the pre-training branch (dashed) is
+not yet implemented.
+
+\begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[node distance=0.45cm and 0.4cm, every node/.style={font=\small, align=center},
+      box/.style={draw, rounded corners, minimum height=1.0cm, inner sep=3pt}, >={Stealth}]
+    \node[box] (seg) {phone segment\\ (start, end,\\ expected phone)};
+    \node[box, right=of seg] (mel) {300\,ms log-mel\\ + phone mask\\ $2\times64\times30$};
+    \node[box, right=of mel, fill=blue!8] (cnn) {CNN encoder\\ 4 conv blocks\\ + avg pool};
+    \node[box, right=of cnn, fill=blue!8] (fc) {concat +\\ FC + sigmoid};
+    \node[box, right=of fc] (out) {$P$(mispron.)\\ e.g.\ \texttt{DH}: 0.91};
+    \node[box, below=0.35cm of fc] (emb) {expected-phone\\ embedding (16-d)};
+    \node[box, dashed, above=0.45cm of mel] (unl) {17,379 unannotated\\ utterances (no test spk.)};
+    \node[box, dashed, right=of unl, fill=blue!4] (pre) {same encoder as\\ 40-way phone classifier};
+    \draw[->] (seg) -- (mel); \draw[->] (mel) -- (cnn); \draw[->] (cnn) -- (fc);
+    \draw[->] (emb) -- (fc); \draw[->] (fc) -- (out);
+    \draw[->, dashed] (unl) -- (pre);
+    \draw[->, dashed] (pre) -- node[right, font=\footnotesize]{initialise} (cnn);
+  \end{tikzpicture}
+  \caption{Pipeline. Solid: implemented and evaluated. Dashed: planned pre-training stage, in which the encoder is
+  first trained to recognise the phone from forced-alignment labels and then reused for detection.}
+  \label{fig:pipeline}
+\end{figure}
+
+\section*{Data Processing}
+\textbf{Done.} All data is collected and processed (\texttt{src/build\_cache.py}). From L2-ARCTIC v5.0
+\cite{zhao2018l2arctic} I parse the \texttt{phones} tier of the 3,599 manually annotated utterances (24 speakers,
+6 L1s), label each expected phone as mispronounced if it is a substitution or deletion, and drop additions (no
+expected phone). Audio is resampled to 16\,kHz and converted to a 64-bin log-mel spectrogram (25\,ms window,
+10\,ms hop); each phone becomes a 300\,ms window centred on it plus a binary mask channel marking its own frames.
+The split is by speaker, with the standard six test speakers used in prior work \cite{peng2021study}:
+
+\begin{center}
+\small
+\begin{tabular}{lrrr}
+  \toprule
+  Split (speakers) & Phones & Mispronounced & Rate \\
+  \midrule
+  Train (12) & 59,582 & 8,472 & 14.2\% \\
+  Validation (6, one per L1) & 29,783 & 4,906 & 16.5\% \\
+  Test (6, one per L1) & 29,786 & 4,140 & 13.9\% \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Deleted phones} (proposal feedback). A deleted phone has no sound of its own, so I checked its annotated
+interval (\texttt{src/deletion\_stats.py}): none of the 3,420 deletions has an empty interval; the annotators give
+them a short slot (median 40\,ms, 5th percentile 24\,ms), and only 13 are shorter than one 10\,ms frame. The window
+is centred on that slot as for any other phone, and the mask always marks at least one frame, so every deletion
+yields a valid input whose context frames show the neighbouring sounds running together.
+\textbf{Challenge.} Six canonical labels contained annotation typos (e.g.\ \texttt{D\_}, \texttt{V``}) and would
+have created spurious classes; they are normalised, leaving 40 phones.
+
+\section*{Baseline Model}
+Per phone: mean and standard deviation of 13 MFCCs with first and second derivatives (78 features) plus a one-hot
+expected phone (40), fed to a class-weighted logistic regression. The decision threshold is chosen on the validation
+speakers only. Test results (\texttt{results/baseline.json}) are in Table~\ref{tab:results}. The baseline beats
+always predicting ``mispronounced'' (F1 0.244), but part of that comes from the phone identity alone: for
+\texttt{DH} and \texttt{TH} it flags every instance (recall 1.00), so its F1 there equals the trivial one.
+
+\section*{Primary Model: First Results}
+\textbf{Architecture.} The CNN of the proposal, trained from scratch (\texttt{src/cnn.py}, 260,577 parameters):
+four blocks of conv $3\times3$ $\rightarrow$ batch norm $\rightarrow$ ReLU $\rightarrow$ max-pool (32, 64, 128, 128
+channels), global average pooling, concatenation with a 16-d expected-phone embedding, then FC(128) with dropout
+0.3 and a sigmoid output. \textbf{Training.} Adam (lr $10^{-3}$), batch 256, binary cross-entropy weighted by the
+negative/positive ratio, up to 15 epochs with early stopping on validation F1 (patience 3); the threshold is
+tuned on validation. One run takes about 3 minutes on an Apple M-series GPU, so I trained five seeds.
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Test results, mispronounced class. CNN: mean $\pm$ sd over training seeds 0--4.}
+  \label{tab:results}
+  \begin{tabular}{lccc}
+    \toprule
+    & Precision & Recall & F1 \\
+    \midrule
+    Always ``mispronounced'' & 0.139 & 1.000 & 0.244 \\
+    Baseline (MFCC + logistic regression) & 0.335 & 0.604 & 0.431 \\
+    CNN from scratch & $0.383 \pm 0.031$ & $0.550 \pm 0.042$ & $\mathbf{0.450 \pm 0.013}$ \\
+    \midrule
+    Korean speaker YKWK only: baseline & 0.362 & 0.635 & 0.461 \\
+    Korean speaker YKWK only: CNN & -- & -- & $0.480 \pm 0.019$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[font=\footnotesize]
+    % ---- training loss: y = (loss - 0.5) * 5 ----
+    \begin{scope}
+      \draw[->] (0,0) -- (5.4,0) node[below left]{epoch};
+      \draw[->] (0,0) -- (0,3.2) node[above]{training loss};
+      \foreach \e in {1,4,7,10} \draw ({0.45*(\e-1)},0) -- ++(0,-0.08) node[below]{\e};
+      \foreach \v/\y in {0.6/0.5, 0.8/1.5, 1.0/2.5} \draw (0,\y) -- ++(-0.08,0) node[left]{\v};
+\draw[blue, thick] plot coordinates {(0.00,2.61) (0.45,2.09) (0.90,1.88) (1.35,1.72) (1.80,1.57) (2.25,1.43) (2.70,1.30) (3.15,1.14) (3.60,0.95) (4.05,0.77)};
+\draw[red, thick] plot coordinates {(0.00,2.58) (0.45,2.15) (0.90,1.96) (1.35,1.81) (1.80,1.61) (2.25,1.48) (2.70,1.30) (3.15,1.15) (3.60,0.94) (4.05,0.74) (4.50,0.51) (4.95,0.28)};
+\draw[teal, thick] plot coordinates {(0.00,2.62) (0.45,2.17) (0.90,2.00) (1.35,1.86) (1.80,1.69) (2.25,1.54) (2.70,1.37) (3.15,1.20) (3.60,1.03) (4.05,0.82) (4.50,0.59)};
+\draw[orange, thick] plot coordinates {(0.00,2.65) (0.45,2.17) (0.90,1.97) (1.35,1.80) (1.80,1.66) (2.25,1.52) (2.70,1.35) (3.15,1.18) (3.60,1.00) (4.05,0.79) (4.50,0.54)};
+\draw[violet, thick] plot coordinates {(0.00,2.69) (0.45,2.17) (0.90,1.97) (1.35,1.81)};
+    \end{scope}
+    % ---- validation F1: y = (F1 - 0.42) * 37.5 ----
+    \begin{scope}[xshift=6.8cm]
+      \draw[->] (0,0) -- (5.4,0) node[below left]{epoch};
+      \draw[->] (0,0) -- (0,3.2) node[above]{validation F1};
+      \foreach \e in {1,4,7,10} \draw ({0.45*(\e-1)},0) -- ++(0,-0.08) node[below]{\e};
+      \foreach \v/\y in {0.43/0.375, 0.46/1.5, 0.49/2.625} \draw (0,\y) -- ++(-0.08,0) node[left]{\v};
+\draw[blue, thick] plot coordinates {(0.00,1.29) (0.45,1.57) (0.90,1.82) (1.35,1.90) (1.80,2.05) (2.25,1.81) (2.70,2.22) (3.15,2.03) (3.60,1.72) (4.05,1.65)};
+\fill[blue] (2.70,2.22) circle (1.5pt);
+\draw[red, thick] plot coordinates {(0.00,0.76) (0.45,1.50) (0.90,1.64) (1.35,1.70) (1.80,2.11) (2.25,1.41) (2.70,2.07) (3.15,2.19) (3.60,2.58) (4.05,1.81) (4.50,1.75) (4.95,1.67)};
+\fill[red] (3.60,2.58) circle (1.5pt);
+\draw[teal, thick] plot coordinates {(0.00,0.31) (0.45,1.32) (0.90,1.75) (1.35,1.29) (1.80,1.89) (2.25,2.18) (2.70,2.28) (3.15,2.64) (3.60,1.82) (4.05,2.16) (4.50,2.13)};
+\fill[teal] (3.15,2.64) circle (1.5pt);
+\draw[orange, thick] plot coordinates {(0.00,0.05) (0.45,1.20) (0.90,1.68) (1.35,1.39) (1.80,1.59) (2.25,1.98) (2.70,1.96) (3.15,2.11) (3.60,1.59) (4.05,1.73) (4.50,1.83)};
+\fill[orange] (3.15,2.11) circle (1.5pt);
+\draw[violet, thick] plot coordinates {(0.00,1.49) (0.45,1.19) (0.90,1.25) (1.35,1.41)};
+\fill[violet] (0.00,1.49) circle (1.5pt);
+    \end{scope}
+  \end{tikzpicture}
+  \caption{Training curves for seeds 0--4 (one colour per seed; dot = epoch kept by early stopping). Training loss
+  keeps falling while validation F1 levels off around 0.47--0.49, i.e.\ the model starts to overfit after a few
+  epochs.}
+  \label{fig:curves}
+\end{figure}
+
+\textbf{Results.} All five seeds beat the baseline on the full test set, and four of five on the Korean speaker
+(Table~\ref{tab:results}). The gain comes from precision (0.335 $\rightarrow$ 0.383) at lower recall. The CNN
+separates voicing errors the baseline mostly misses (\texttt{D}$\rightarrow$\texttt{T} flagged 48\% vs.\ 26\%,
+\texttt{P}$\rightarrow$\texttt{B} 40\% vs.\ 26\%), but on \texttt{DH} and \texttt{TH} it behaves like the baseline
+(F1 0.724 and 0.603 vs.\ trivial 0.730 and 0.613), so the expected-phone input still explains those phones.
+\textbf{Caveats.} The margin over the baseline (0.019 F1) is small, and the $\pm$ covers training seeds only, not
+the choice of test speakers. All Korean-specific numbers come from a \emph{single} test speaker (YKWK) and may
+reflect that speaker rather than Korean learners in general. Test phone boundaries come from the manual annotation,
+which a real tutoring system would not have.
+
+\section*{Next Steps (Final Report, Dec 8)}
+\begin{enumerate}
+  \setlength\itemsep{0pt}
+  \item \textbf{Pre-training} (Figure~\ref{fig:pipeline}, dashed): train the encoder as a 40-way phone classifier on
+  the forced-alignment segments of the 17,379 unannotated non-test utterances, then fine-tune for detection.
+  \item \textbf{Ablation}: CNN with vs.\ without pre-training, five seeds each, against the same baseline.
+  \item \textbf{Oracle segmentation}: re-evaluate the saved models with test boundaries taken from the corpus's
+  forced-alignment TextGrids instead of the manual annotation, to measure how much the oracle boundaries help.
+  \item \textbf{Overfitting}: data augmentation (SpecAugment-style time/frequency masking) and stronger dropout,
+  since validation F1 stops improving after a few epochs.
+  \item If time allows, a small set of my own Korean-accented recordings as an additional test set.
+\end{enumerate}
+
+\newpage
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

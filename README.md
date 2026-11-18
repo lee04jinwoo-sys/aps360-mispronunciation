@@ -23,7 +23,7 @@ redistributed here; request your own copy from the official site and unzip it in
 - [x] CNN trained from scratch (5 seeds)
 - [x] Error analysis by phone, error type, substitution pair and L1
 - [x] Deleted-phone segments checked (`results/deletion_stats.json`): 3,420 deletions, none empty, median 40 ms
-- [ ] Weakly supervised pre-training on forced-alignment labels (planned)
+- [x] Weakly supervised pre-training on forced-alignment labels + ablation (2026-11-17, see below)
 
 ### Baseline results (`results/baseline.json`)
 
@@ -82,6 +82,25 @@ Chinese +0.187, Vietnamese +0.181, Hindi +0.154 (smallest).
 Caveats: one test speaker per L1; rare phones are noisy (ZH n=33, AX n=1); the substitution table only covers
 substitutions with a recorded perceived phone.
 
+### Pre-training ablation (`results/pretrain_ablation.json`, protocol fixed first in `results/pretrain_protocol.md`)
+
+Encoder pre-trained as a 40-way phone classifier on 547,208 forced-alignment segments from the 17,379 unannotated
+utterances of the 18 non-test speakers (held-out phone accuracy 0.764 vs. 0.086 majority class, `results/pretrain.json`),
+then fine-tuned exactly like the scratch CNN. Seeds 0-4 each.
+
+| | Scratch CNN | Pre-trained CNN |
+|---|---|---|
+| Test F1 (primary) | 0.450 ± 0.013 | 0.462 ± 0.010 |
+| Per-seed difference | | +0.027, +0.002, -0.003, +0.011, +0.026 (4 of 5 better) |
+| Korean (YKWK) F1 | 0.480 ± 0.019 | 0.486 ± 0.009 |
+| DH F1 (always-positive 0.730) | 0.724 | 0.725 |
+| TH F1 (always-positive 0.613) | 0.603 | 0.569 |
+| Z F1 (always-positive 0.687) | 0.699 | 0.710 |
+
+By the pre-registered rule (higher mean test F1) pre-training helps (+0.013). The difference is about one seed standard
+deviation and covers training seeds only. It does not fix DH and TH: on both phones the pre-trained model is still at or
+below the always-"mispronounced" F1. Fine-tuning reaches its best validation epoch earlier (epochs 2-5; scratch: 7-9, except seed 4 at epoch 1).
+
 ## Reproduce
 
 ```bash
@@ -91,5 +110,9 @@ python -m src.run_baseline
 python -m src.run_cnn data/cache 0   # one seed, ~3 min on Apple MPS (seeds 0-4 for the error analysis)
 python -m src.run_error_analysis data/l2arctic data/cache   # ~15 s
 python -m src.deletion_stats data/l2arctic
+python -m src.pretrain data/l2arctic data/cache      # ~1 min, ~2.3 GB cache
+python -m src.run_pretrain data/cache                # ~23 min on Apple MPS
+python -m src.run_cnn data/cache 0 --pretrained      # seeds 0-4
+python -m src.run_ablation data/l2arctic data/cache
 python -m pytest -q
 ```

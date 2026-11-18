@@ -1,0 +1,90 @@
+{
+  "primary_test_f1": {
+    "scratch_mean": 0.4495673894913783,
+    "scratch_sd": 0.013081658700299148,
+    "pretrained_mean": 0.46218621665543325,
+    "pretrained_sd": 0.010468379995508783,
+    "mean_diff": 0.012618827164054935,
+    "paired_diffs": [
+      0.027411515098296146,
+      0.0023357743482357307,
+      -0.003318358770187879,
+      0.010539441430117313,
+      0.02612576371381342
+    ],
+    "paired_wins": 4,
+    "pretraining_helps": true
+  },
+  "per_seed_test_f1": {
+    "scratch": [
+      0.44518540972011716,
+      0.4677122769064359,
+      0.4584174404521598,
+      0.43724009165747263,
+      0.43928172872070603
+    ],
+    "pretrained": [
+      0.4725969248184133,
+      0.47004805125467164,
+      0.45509908168197194,
+      0.44777953308758994,
+      0.46540749243451945
+    ]
+  },
+  "secondary_korean_f1": {
+    "scratch_mean": 0.47994712610734086,
+    "scratch_sd": 0.01928880228375224,
+    "pretrained_mean": 0.48591599991696344,
+    "pretrained_sd": 0.008822594556433382,
+    "mean_diff": 0.005968873809622577,
+    "paired_diffs": [
+      -0.027747233696890528,
+      0.029850746268656747,
+      0.003058784958986982,
+      -0.0014820758857513328,
+      0.026164147403110793
+    ],
+    "paired_wins": 3,
+    "pretraining_helps": true
+  },
+  "secondary_focus_phones": {
+    "DH": {
+      "n": 916,
+      "error_rate": 0.5753275109170306,
+      "always_positive_f1": 0.7304227304227304,
+      "scratch_f1_mean": 0.7239384406478017,
+      "pretrained_f1_mean": 0.724995459848434,
+      "scratch_recall_mean": 0.9635673624288426,
+      "pretrained_recall_mean": 0.9590132827324478,
+      "scratch_precision_mean": 0.5800197342612436,
+      "pretrained_precision_mean": 0.5829994833542532
+    },
+    "TH": {
+      "n": 222,
+      "error_rate": 0.44144144144144143,
+      "always_positive_f1": 0.6125,
+      "scratch_f1_mean": 0.6029053252562778,
+      "pretrained_f1_mean": 0.5693609332851828,
+      "scratch_recall_mean": 0.9448979591836734,
+      "pretrained_recall_mean": 0.7795918367346939,
+      "scratch_precision_mean": 0.4427365423652331,
+      "pretrained_precision_mean": 0.4512097627560435
+    },
+    "Z": {
+      "n": 978,
+      "error_rate": 0.523517382413088,
+      "always_positive_f1": 0.6872483221476511,
+      "scratch_f1_mean": 0.6990692407793022,
+      "pretrained_f1_mean": 0.7101908371400504,
+      "scratch_recall_mean": 0.888671875,
+      "pretrained_recall_mean": 0.96015625,
+      "scratch_precision_mean": 0.5790185488752042,
+      "pretrained_precision_mean": 0.5636390814959131
+    }
+  },
+  "pretrained_precision_recall_mean": {
+    "precision": 0.38993899048709485,
+    "recall": 0.5720289855072463
+  },
+  "reproduction_check": "both families rebuilt from checkpoints, within 2e-3 of saved test F1"
+}

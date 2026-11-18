@@ -46,11 +46,12 @@ The model takes a recording of a read English sentence and the phones the speake
 flags each phone as \emph{correct} or \emph{mispronounced}. The motivation is that Korean learners make systematic
 substitutions they cannot easily hear themselves (in L2-ARCTIC the most frequent Korean-L1 errors are
 \texttt{DH}$\rightarrow$\texttt{D} and \texttt{Z}$\rightarrow$\texttt{S}), while most speaking apps return only a
-sentence-level score. \textbf{Success criterion} (added after proposal feedback): models are compared by precision,
-recall and F1 on the \emph{mispronounced} class on six held-out test speakers; the CNN counts as a success if its
-F1 is above the MFCC logistic-regression baseline for every training seed, and the pre-trained CNN if it is above
-the CNN trained from scratch. Figure~\ref{fig:pipeline} shows the pipeline; the pre-training branch (dashed) is
-not yet implemented.
+sentence-level score. Following the proposal feedback, success is defined as follows: models are compared by
+precision, recall and F1 on the \emph{mispronounced} class on six held-out test speakers; the CNN counts as a
+success if its F1 is above the MFCC logistic-regression baseline for every training seed, and the pre-trained CNN
+if it is above the CNN trained from scratch. To date, all data has been processed, the baseline is complete, and
+the primary CNN has been trained and evaluated with five seeds. Figure~\ref{fig:pipeline} shows the pipeline; the
+pre-training branch (dashed) is not yet implemented.
 
 \begin{figure}[!h]
   \centering
@@ -75,15 +76,19 @@ not yet implemented.
 \end{figure}
 
 \section*{Data Processing}
-\textbf{Done.} All data is collected and processed (\texttt{src/build\_cache.py}). From L2-ARCTIC v5.0
-\cite{zhao2018l2arctic} I parse the \texttt{phones} tier of the 3,599 manually annotated utterances (24 speakers,
-6 L1s), label each expected phone as mispronounced if it is a substitution or deletion, and drop additions (no
-expected phone). Audio is resampled to 16\,kHz and converted to a 64-bin log-mel spectrogram (25\,ms window,
-10\,ms hop); each phone becomes a 300\,ms window centred on it plus a binary mask channel marking its own frames.
-The split is by speaker, with the standard six test speakers used in prior work \cite{peng2021study}:
+All data has been collected and processed (\texttt{src/build\_cache.py}). From L2-ARCTIC v5.0
+\cite{zhao2018l2arctic} I parsed the \texttt{phones} tier of the 3,599 manually annotated utterances (24 speakers,
+6 L1s), labelled each expected phone as mispronounced if it was a substitution or deletion, and dropped additions
+(no expected phone). Audio was resampled to 16\,kHz and converted to a 64-bin log-mel spectrogram (25\,ms window,
+10\,ms hop); each phone became a 300\,ms window centred on it plus a binary mask channel marking its own frames.
+The split is by speaker, with the standard six test speakers used in prior work \cite{peng2021study}
+(Table~\ref{tab:split}).
 
-\begin{center}
+\begin{table}[!h]
+\centering
 \small
+\caption{Speaker-disjoint data split (phones with an expected phone; additions excluded).}
+\label{tab:split}
 \begin{tabular}{lrrr}
   \toprule
   Split (speakers) & Phones & Mispronounced & Rate \\
@@ -93,29 +98,28 @@ The split is by speaker, with the standard six test speakers used in prior work 
   Test (6, one per L1) & 29,786 & 4,140 & 13.9\% \\
   \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
 \textbf{Deleted phones} (proposal feedback). A deleted phone has no sound of its own, so I checked its annotated
-interval (\texttt{src/deletion\_stats.py}): none of the 3,420 deletions has an empty interval; the annotators give
+interval (\texttt{src/deletion\_stats.py}): none of the 3,420 deletions has an empty interval; the annotators gave
 them a short slot (median 40\,ms, 5th percentile 24\,ms), and only 13 are shorter than one 10\,ms frame. The window
 is centred on that slot as for any other phone, and the mask always marks at least one frame, so every deletion
-yields a valid input whose context frames show the neighbouring sounds running together.
+yields a valid input.
 \textbf{Challenge.} Six canonical labels contained annotation typos (e.g.\ \texttt{D\_}, \texttt{V``}) and would
-have created spurious classes; they are normalised, leaving 40 phones.
+have created spurious classes; I normalised them, leaving 40 phones.
 
 \section*{Baseline Model}
 Per phone: mean and standard deviation of 13 MFCCs with first and second derivatives (78 features) plus a one-hot
-expected phone (40), fed to a class-weighted logistic regression. The decision threshold is chosen on the validation
-speakers only. Test results (\texttt{results/baseline.json}) are in Table~\ref{tab:results}. The baseline beats
-always predicting ``mispronounced'' (F1 0.244), but part of that comes from the phone identity alone: for
-\texttt{DH} and \texttt{TH} it flags every instance (recall 1.00), so its F1 there equals the trivial one.
+expected phone (40), fed to a class-weighted logistic regression. The decision threshold was chosen on the
+validation speakers only. Test results (\texttt{results/baseline.json}) are in Table~\ref{tab:results}; the
+baseline clearly beats always predicting ``mispronounced'' (F1 0.431 vs.\ 0.244).
 
 \section*{Primary Model: First Results}
 \textbf{Architecture.} The CNN of the proposal, trained from scratch (\texttt{src/cnn.py}, 260,577 parameters):
 four blocks of conv $3\times3$ $\rightarrow$ batch norm $\rightarrow$ ReLU $\rightarrow$ max-pool (32, 64, 128, 128
 channels), global average pooling, concatenation with a 16-d expected-phone embedding, then FC(128) with dropout
 0.3 and a sigmoid output. \textbf{Training.} Adam (lr $10^{-3}$), batch 256, binary cross-entropy weighted by the
-negative/positive ratio, up to 15 epochs with early stopping on validation F1 (patience 3); the threshold is
+negative/positive ratio, up to 15 epochs with early stopping on validation F1 (patience 3); the threshold was
 tuned on validation. One run takes about 3 minutes on an Apple M-series GPU, so I trained five seeds.
 
 \begin{table}[!h]
@@ -132,7 +136,7 @@ tuned on validation. One run takes about 3 minutes on an Apple M-series GPU, so 
     CNN from scratch & $0.383 \pm 0.031$ & $0.550 \pm 0.042$ & $\mathbf{0.450 \pm 0.013}$ \\
     \midrule
     Korean speaker YKWK only: baseline & 0.362 & 0.635 & 0.461 \\
-    Korean speaker YKWK only: CNN & -- & -- & $0.480 \pm 0.019$ \\
+    Korean speaker YKWK only: CNN & $0.409 \pm 0.032$ & $0.586 \pm 0.046$ & $0.480 \pm 0.019$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -177,10 +181,14 @@ tuned on validation. One run takes about 3 minutes on an Apple M-series GPU, so 
 \end{figure}
 
 \textbf{Results.} All five seeds beat the baseline on the full test set, and four of five on the Korean speaker
-(Table~\ref{tab:results}). The gain comes from precision (0.335 $\rightarrow$ 0.383) at lower recall. The CNN
-separates voicing errors the baseline mostly misses (\texttt{D}$\rightarrow$\texttt{T} flagged 48\% vs.\ 26\%,
-\texttt{P}$\rightarrow$\texttt{B} 40\% vs.\ 26\%), but on \texttt{DH} and \texttt{TH} it behaves like the baseline
-(F1 0.724 and 0.603 vs.\ trivial 0.730 and 0.613), so the expected-phone input still explains those phones.
+(Table~\ref{tab:results}). Seed 4 peaked at epoch 1 and stopped early (Figure~\ref{fig:curves}), yet still beat
+the baseline. The gain comes from precision (0.335 $\rightarrow$ 0.383) at lower recall. At their own
+validation-tuned thresholds, the CNN flags more voicing errors than the baseline (\texttt{D}$\rightarrow$\texttt{T}
+48\% vs.\ 26\%, \texttt{P}$\rightarrow$\texttt{B} 40\% vs.\ 26\%). On \texttt{DH} and \texttt{TH}, however, neither
+model makes use of the audio: the baseline flags almost every instance (recall 0.998 and 1.00), so its F1 (0.730,
+0.613) essentially equals that of always predicting ``mispronounced'', and the CNN lands on nearly the same values
+(0.724, 0.603). The expected-phone input alone
+explains these two phones.
 \textbf{Caveats.} The margin over the baseline (0.019 F1) is small, and the $\pm$ covers training seeds only, not
 the choice of test speakers. All Korean-specific numbers come from a \emph{single} test speaker (YKWK) and may
 reflect that speaker rather than Korean learners in general. Test phone boundaries come from the manual annotation,

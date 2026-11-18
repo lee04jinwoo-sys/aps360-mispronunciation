@@ -1,0 +1,18 @@
+{
+  "example_1": {
+    "row": 5016,
+    "speaker": "HKK",
+    "utterance": "arctic_a0003",
+    "expected": "DH",
+    "perceived": "DH",
+    "label": 0
+  },
+  "example_2": {
+    "row": 5617,
+    "speaker": "HKK",
+    "utterance": "arctic_a0026",
+    "expected": "DH",
+    "perceived": "D",
+    "label": 1
+  }
+}

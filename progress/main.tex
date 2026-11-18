@@ -41,19 +41,21 @@
 % DRAFT -- every number below comes from a file in results/ (see README "Reproduce").
 % Rewrite in your own words before submitting. Check the page limit on Quercus.
 
-\section*{Project Description}
-This project builds a model that listens to a learner reading an English sentence and marks each phone as
-\emph{correct} or \emph{mispronounced}. The model is also told which phone the speaker should have said. Korean
-learners tend to make the same substitutions again and again, and they often cannot hear these errors in their
-own speech. In L2-ARCTIC the most common ones are \texttt{DH}$\rightarrow$\texttt{D} and
-\texttt{Z}$\rightarrow$\texttt{S}. Most speaking apps only give one score for the whole sentence, which does not tell
-the learner which sound to fix.
 
-I measure performance with precision, recall and F1 on the mispronounced class, using six speakers that are never
-seen during training. I will consider the CNN successful if its F1 beats the MFCC logistic-regression baseline for
-every training seed, and the pre-trained CNN successful if it also beats the CNN trained from scratch. So far I have
-processed all of the data, finished the baseline, and trained and tested the CNN with five seeds.
-Figure~\ref{fig:pipeline} shows the pipeline. The pre-training branch (dashed) has not been built yet.
+\section*{Brief Project Description}
+This project builds a model that listens to a learner reading an English sentence and marks each phone as
+\emph{correct} or \emph{mispronounced}. The \textbf{input} is a short spectrogram window around one phone, together
+with the phone the speaker \emph{should} have said; the \textbf{output} is the probability that this phone was
+mispronounced (Figure~\ref{fig:pipeline}). Korean learners tend to make the same substitutions again and again, such
+as \texttt{DH}$\rightarrow$\texttt{D} (``the'' read as ``de'') and \texttt{Z}$\rightarrow$\texttt{S}, and they often
+cannot hear these errors in their own speech. Most speaking apps only give one score for the whole sentence, which
+does not tell the learner which sound to fix.
+
+Deep learning suits this task because the same phone sounds very different across speakers, voices and
+microphones, so hand-set acoustic rules generalize poorly. A CNN can learn the relevant time--frequency patterns
+directly from the spectrogram, and the corpus provides over 100,000 labelled phones to learn from. I measure
+precision, recall and F1 on the mispronounced class on six speakers never seen in training; the CNN counts as a
+success if its F1 beats the baseline for every training seed.
 
 \begin{figure}[!h]
   \centering
@@ -72,27 +74,37 @@ Figure~\ref{fig:pipeline} shows the pipeline. The pre-training branch (dashed) h
     \draw[->, dashed] (unl) -- (pre);
     \draw[->, dashed] (pre) -- node[right, font=\footnotesize]{initialize} (cnn);
   \end{tikzpicture}
-  \caption{Pipeline. Solid parts are implemented and evaluated. Dashed parts show the planned pre-training stage:
-  the encoder is first trained to recognize phones from forced-alignment labels and is then reused for detection.}
+  \caption{Model input and output. The dashed branch is the pre-training stage: the encoder is first trained to
+  recognize phones from forced-alignment labels and is then reused for detection.}
   \label{fig:pipeline}
 \end{figure}
 
-\section*{Data Processing}
-I use L2-ARCTIC v5.0 \cite{zhao2018l2arctic}, which has 24 speakers from six first languages. 3,599 of its
-utterances have manual phone-level annotations. I read the phone tier of each annotation file and labelled a
-phone as mispronounced when the annotator marked it as a substitution or a deletion. Additions were left out,
-since there is no expected phone to classify.
+\section*{Notable Contribution}
+\subsection*{Data Processing}
+I use L2-ARCTIC v5.0 \cite{zhao2018l2arctic}: 24 speakers from six first languages, 3,599 of whose utterances have
+manual phone-level annotations. I read the phone tier of each annotation file and labelled a phone as mispronounced
+when the annotator marked it as a substitution or a deletion. Additions were left out, since they have no expected
+phone. The audio was resampled to 16\,kHz and turned into a 64-bin log-mel spectrogram (25\,ms window, 10\,ms hop).
+Phones are very short (median about 90\,ms), so each sample is a 300\,ms window centred on the phone, plus a second
+channel, a binary mask marking the phone's own frames (Figure~\ref{fig:example}). I split the data by speaker so no
+voice appears in both training and testing; the test set is the six speakers used in earlier work
+\cite{peng2021study} (Table~\ref{tab:split}).
 
-The audio was resampled to 16\,kHz and turned into a 64-bin log-mel spectrogram with a 25\,ms window and a 10\,ms
-hop. Most phones are very short (median about 90\,ms), so the spectrogram of a single phone carries little
-information. I therefore cut a 300\,ms window centred on each phone and added a second channel, a binary mask that
-marks which frames belong to the phone itself. This way the model sees the surrounding sounds but still knows
-which part it is judging.
-
-I split the data by speaker so that no voice appears in both training and testing; otherwise the model could
-learn to recognize speakers instead of errors. The test set is the six speakers used in earlier work on this
-corpus \cite{peng2021study}, one per first language, so my numbers can be compared with theirs
-(Table~\ref{tab:split}).
+\begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[font=\footnotesize]
+    \node[inner sep=0] (a) {\includegraphics[width=4.6cm,height=2.6cm]{example_1.png}};
+    \node[inner sep=0, right=0.8cm of a] (b) {\includegraphics[width=4.6cm,height=2.6cm]{example_2.png}};
+    \node[below=1pt of a, align=center] {``\emph{the}'': \texttt{DH} correct (label 0)};
+    \node[below=1pt of b, align=center] {``\emph{there}'': \texttt{DH} heard as \texttt{D} (label 1)};
+    \node[left=1pt of a, rotate=90, anchor=south] {mel bin $\rightarrow$};
+    \node[above=1pt of a] {time (300\,ms) $\rightarrow$};
+    \node[above=1pt of b] {time (300\,ms) $\rightarrow$};
+  \end{tikzpicture}
+  \caption{Two cleaned training samples from Korean speaker HKK (log-mel channel; the white box is the mask, i.e.\
+  the phone being judged). The model sees the phone together with its neighbours.}
+  \label{fig:example}
+\end{figure}
 
 \begin{table}[!h]
 \centering
@@ -110,39 +122,39 @@ corpus \cite{peng2021study}, one per first language, so my numbers can be compar
 \end{tabular}
 \end{table}
 
-A deleted phone has no sound of its own, so it was not obvious what its window should contain. I checked the
-annotated intervals of all 3,420 deletions. None of them is empty: the annotators gave each deletion a short slot
-between its neighbours (median 40\,ms), and only 13 are shorter than one 10\,ms frame. I centre the window on this
-slot like any other phone, and the mask always marks at least one frame, so every deletion still produces a valid
-input.
+\textbf{Challenges.} A deleted phone has no sound of its own, so it was not obvious what its window should contain.
+None of the 3,420 deletions has an empty interval: the annotators gave each a short slot (median 40\,ms), and the
+mask always marks at least one frame, so every deletion still produces a valid input. A handful of canonical labels
+contained typos (e.g.\ \texttt{D\_}) that would have created six extra classes; after cleaning, 40 phones remain.
+\textbf{New test data.} Because L2-ARCTIC has only one Korean test speaker, I will record myself reading 50 ARCTIC
+prompts and label the phones by listening, starting from a forced alignment, as a never-before-seen test set. If the
+labels turn out too unreliable, I will instead test on speechocean762 \cite{zhang2021speechocean}, a separate corpus
+with phone-level pronunciation scores.
 
-One problem I ran into while parsing was a handful of typos in the canonical labels, such as \texttt{D\_}. Left as
-they were, they would have become six extra phone classes. After cleaning them up, 40 phones remain.
+\subsection*{Baseline Model}
+Each phone is summarized by the mean and standard deviation of 13 MFCCs and their first and second derivatives (78
+numbers) plus a one-hot expected phone, and classified by a class-weighted logistic regression whose threshold is
+chosen on the validation speakers. It reaches a test F1 of 0.431, well above the 0.244 of always predicting
+``mispronounced'' (Table~\ref{tab:results}). \textbf{Qualitative result.} On \texttt{DH} and \texttt{TH} the
+baseline flags almost every instance (recall 0.998 and 1.00), so its F1 there (0.730, 0.613) equals that of always
+guessing ``mispronounced'': for these phones it relies on the phone identity, not the audio. \textbf{Challenge.}
+Averaging MFCCs over the phone throws away how the sound changes in time and ignores the neighbouring sounds.
 
-\section*{Baseline Model}
-For the baseline, I summarize each phone by the mean and standard deviation of 13 MFCCs and their first and second
-derivatives (78 numbers), and append a one-hot vector for the expected phone. A logistic regression with class
-weights is trained on these features. I choose its decision threshold on the validation speakers only. On the test
-set it reaches an F1 of 0.431, well above the 0.244 obtained by always predicting ``mispronounced''
-(Table~\ref{tab:results}).
-
-\section*{Primary Model: First Results}
-The CNN follows the design in my proposal and is trained from scratch. It has four convolution blocks
-($3\times3$ convolution, batch norm, ReLU and max-pooling, with 32, 64, 128 and 128 channels), followed by global
-average pooling. The pooled 128-dimensional vector is joined with a 16-dimensional embedding of the expected
-phone and passed through a hidden layer of 128 units with dropout 0.3 and a sigmoid output. In total the model has
-260,577 parameters.
-
-I train it with Adam (learning rate $10^{-3}$, batch size 256) and binary cross-entropy. Because only about one
-phone in seven is mispronounced, the loss gives the positive class a weight equal to the ratio of negatives to
-positives. Training stops when validation F1 has not improved for three epochs, and the decision threshold is
-again tuned on the validation speakers. A single run takes about three minutes on my laptop's GPU, so I repeated
-training with five random seeds to check that any gain over the baseline is not just luck.
+\subsection*{Primary Model}
+The CNN has four convolution blocks ($3\times3$ convolution, batch norm, ReLU, $2\times2$ max-pooling; 32, 64, 128
+and 128 channels) and global average pooling. The pooled 128-d vector is joined with a 16-d embedding of the expected
+phone and passed through a 128-unit hidden layer (dropout 0.3) to a sigmoid output; 260,577 parameters in total. It
+is trained with Adam (learning rate $10^{-3}$, batch 256) and binary cross-entropy whose positive class is weighted by
+the negative/positive ratio (about 6:1). Training stops when validation F1 has not improved for three epochs, and the
+threshold is tuned on the validation speakers. Each run takes about three minutes on a laptop GPU, so I trained five
+seeds. In the pre-trained version, the same encoder is first trained as a 40-way phone classifier on 547,208
+forced-alignment segments from the 17,379 unannotated utterances of the 18 non-test speakers (76.4\% held-out phone
+accuracy), then fine-tuned in exactly the same way.
 
 \begin{table}[!h]
   \centering
   \small
-  \caption{Test results, mispronounced class. CNN: mean $\pm$ sd over training seeds 0--4.}
+  \caption{Test results, mispronounced class. CNN rows: mean $\pm$ sd over training seeds 0--4.}
   \label{tab:results}
   \begin{tabular}{lccc}
     \toprule
@@ -150,10 +162,12 @@ training with five random seeds to check that any gain over the baseline is not 
     \midrule
     Always ``mispronounced'' & 0.139 & 1.000 & 0.244 \\
     Baseline (MFCC + logistic regression) & 0.335 & 0.604 & 0.431 \\
-    CNN from scratch & $0.383 \pm 0.031$ & $0.550 \pm 0.042$ & $\mathbf{0.450 \pm 0.013}$ \\
+    CNN from scratch & $0.383 \pm 0.031$ & $0.550 \pm 0.042$ & $0.450 \pm 0.013$ \\
+    CNN, pre-trained encoder & $0.390 \pm 0.027$ & $0.572 \pm 0.038$ & $\mathbf{0.462 \pm 0.010}$ \\
     \midrule
-    Korean speaker YKWK only: baseline & 0.362 & 0.635 & 0.461 \\
-    Korean speaker YKWK only: CNN & $0.409 \pm 0.032$ & $0.586 \pm 0.046$ & $0.480 \pm 0.019$ \\
+    Korean speaker YKWK: baseline & 0.362 & 0.635 & 0.461 \\
+    Korean speaker YKWK: CNN from scratch & $0.409 \pm 0.032$ & $0.586 \pm 0.046$ & $0.480 \pm 0.019$ \\
+    Korean speaker YKWK: CNN, pre-trained & $0.417 \pm 0.046$ & $0.597 \pm 0.067$ & $0.486 \pm 0.009$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -191,43 +205,28 @@ training with five random seeds to check that any gain over the baseline is not 
 \fill[violet] (0.00,1.49) circle (1.5pt);
     \end{scope}
   \end{tikzpicture}
-  \caption{Training curves for the five seeds (one colour per seed; the dot marks the epoch kept by early
+  \caption{Scratch CNN training curves for the five seeds (one colour per seed; the dot marks the epoch kept by early
   stopping). Training loss keeps going down while validation F1 flattens out around 0.47--0.49, so the model
   starts to overfit after a few epochs.}
   \label{fig:curves}
 \end{figure}
 
-All five seeds beat the baseline on the full test set, and four of the five also beat it on the Korean test
-speaker (Table~\ref{tab:results}). Seed 4 reached its best validation score in the first epoch and stopped early
-(Figure~\ref{fig:curves}), but it still did better than the baseline. Most of the improvement comes from
-precision, which rises from 0.335 to 0.383, while recall drops a little.
+\textbf{Quantitative results.} All five scratch seeds beat the baseline, and pre-training raises the mean test F1
+from 0.450 to 0.462, with four of five seeds better than the scratch run with the same seed. The gain mostly comes
+from precision. The differences are small (about one standard deviation, which covers training seeds only), and the
+Korean numbers come from a single speaker. \textbf{Qualitative results.} At its own threshold the scratch CNN flags
+more voicing errors than the baseline (48\% vs.\ 26\% of \texttt{D}$\rightarrow$\texttt{T}, 40\% vs.\ 26\% of
+\texttt{P}$\rightarrow$\texttt{B}). However, neither CNN uses the audio for \texttt{DH}: its F1 (0.724 scratch, 0.725
+pre-trained) stays at the always-``mispronounced'' level, and pre-training even lowers \texttt{TH} (0.569).
+\textbf{Challenges.} The model overfits within a few epochs (Figure~\ref{fig:curves}), and the phones that motivate
+the project are still not detected from sound.
 
-Looking at individual error types, the CNN catches more voicing errors than the baseline. It flags 48\% of
-\texttt{D}$\rightarrow$\texttt{T} substitutions compared with 26\%, and 40\% of \texttt{P}$\rightarrow$\texttt{B}
-compared with 26\%. These rates are measured at each model's own threshold, so they are not a perfectly equal
-comparison. The phones \texttt{DH} and \texttt{TH} tell a less encouraging story. The baseline flags almost every
-\texttt{DH} and \texttt{TH} it sees (recall 0.998 and 1.00), which gives the same F1 as always guessing
-``mispronounced'' (0.730 and 0.613). The CNN ends up at nearly the same values (0.724 and 0.603). In other words,
-for these two phones neither model is really using the audio; they rely on the fact that these phones are usually
-mispronounced.
-
-These results have some limits. The gap over the baseline is only 0.019 F1, and the standard deviations reflect
-different training seeds, not different choices of test speakers. The Korean numbers come from one speaker
-(YKWK), so they may say more about that person than about Korean learners in general. Finally, the phone
-boundaries at test time come from the manual annotation, which a real tutoring system would not have.
-
-\section*{Next Steps}
-Before the final report (December 8), I plan to:
-\begin{enumerate}
-  \setlength\itemsep{0pt}
-  \item Pre-train the encoder as a 40-way phone classifier on the 17,379 unannotated utterances from non-test
-  speakers, using their forced-alignment boundaries, and then fine-tune it for detection.
-  \item Compare the CNN with and without pre-training, five seeds each, against the same baseline.
-  \item Test the trained models with phone boundaries from the corpus's forced alignments instead of the manual
-  annotation, to see how much the hand-marked boundaries help.
-  \item Reduce overfitting with time and frequency masking on the spectrograms and stronger dropout.
-  \item If time allows, record a small set of Korean-accented speech as an extra test set.
-\end{enumerate}
+\section*{Feasibility and Next Steps}
+All data processing, the baseline and both CNN variants are done, and one full training run takes minutes, so the
+remaining three weeks are enough for: (1)~reducing overfitting with time/frequency masking and stronger dropout;
+(2)~testing with forced-alignment instead of hand-marked phone boundaries, which a real tutoring system would not
+have; (3)~investigating why \texttt{DH} and \texttt{TH} are not learned, e.g.\ by inspecting their annotations and
+training a model on these phones alone; and (4)~collecting and labelling the new Korean test set described above.
 
 \newpage
 \bibliographystyle{plain}

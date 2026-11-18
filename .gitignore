@@ -12,3 +12,5 @@ progress/*.log
 progress/*.out
 progress/*.bbl
 progress/*.blg
+progress/student_info.tex
+progress/main.pdf

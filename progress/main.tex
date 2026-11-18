@@ -20,11 +20,15 @@
 \renewcommand{\@noticestring}{}
 \makeatother
 
+% Student number and email live in student_info.tex, which is git-ignored
+% because this repository is public.
+\IfFileExists{student_info.tex}{\input{student_info.tex}}{\newcommand{\studentinfo}{Student Number: XXXXXXXXXX, (email omitted)}}
+
 \title{Progress Report:\\ Phone-Level Mispronunciation Detection for Korean Learners of English}
 
 \author{%
   Jinwoo Lee \\
-  Student Number: XXXXXXXXXX, (email omitted)\\
+  \studentinfo\\
   \url{https://github.com/lee04jinwoo-sys/aps360-mispronunciation}\\
 }
 
